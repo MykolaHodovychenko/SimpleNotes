@@ -1,52 +1,42 @@
 package ua.opu.simplenotes.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import ua.opu.simplenotes.ui.screens.Note
 import ua.opu.simplenotes.ui.screens.NoteColor
 import ua.opu.simplenotes.ui.screens.NoteEditUiState
 import ua.opu.simplenotes.ui.screens.NotesListUiState
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import ua.opu.simplenotes.data.repository.NoteRepository
 
-class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
+class NotesViewModel(
+    private val repository: NoteRepository
+) : ViewModel() {
 
-    private val _notes = MutableStateFlow(
-        listOf(
-            Note(
-                id = 1,
-                title = "Купити продукти",
-                text = "Молоко, хліб, сир, яйця",
-                color = NoteColor.Yellow
-            ),
-            Note(
-                id = 2,
-                title = "Ідеї для проєкту",
-                text = "Додати екран списку, екран редагування та вибір кольору нотатки",
-                color = NoteColor.Blue
-            ),
-            Note(
-                id = 3,
-                title = "Плани на вихідні",
-                text = "Прибрати квартиру, погуляти, подивитися фільм",
-                color = NoteColor.Green
-            )
-        )
-    )
-
-    private val _notesListUiState = MutableStateFlow(
-        NotesListUiState(
-            notes = _notes.value
-        )
-    )
     val notesListUiState: StateFlow<NotesListUiState> =
-        _notesListUiState.asStateFlow()
+        repository.getAllNotes()
+            .map { notes ->
+                NotesListUiState(
+                    notes = notes
+                )
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = NotesListUiState()
+            )
 
     private val _noteEditUiState = MutableStateFlow(
         NoteEditUiState()
     )
+
     val noteEditUiState: StateFlow<NoteEditUiState> =
         _noteEditUiState.asStateFlow()
 
@@ -61,16 +51,18 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
     }
 
     fun prepareEditNote(noteId: Int) {
-        val note = _notes.value.firstOrNull { it.id == noteId }
+        viewModelScope.launch {
+            val note = repository.getNoteById(noteId)
 
-        if (note != null) {
-            _noteEditUiState.value = NoteEditUiState(
-                noteId = note.id,
-                title = note.title,
-                text = note.text,
-                color = note.color,
-                isEditMode = true
-            )
+            if (note != null) {
+                _noteEditUiState.value = NoteEditUiState(
+                    noteId = note.id,
+                    title = note.title,
+                    text = note.text,
+                    color = note.color,
+                    isEditMode = true
+                )
+            }
         }
     }
 
@@ -105,63 +97,25 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
             return
         }
 
-        if (currentState.isEditMode) {
-            updateExistingNote(currentState)
-        } else {
-            createNewNote(currentState)
-        }
+        viewModelScope.launch {
+            val note = Note(
+                id = currentState.noteId ?: 0,
+                title = currentState.title.trim(),
+                text = currentState.text.trim(),
+                color = currentState.color
+            )
 
-        refreshListState()
+            if (currentState.isEditMode) {
+                repository.updateNote(note)
+            } else {
+                repository.insertNote(note)
+            }
+        }
     }
 
     fun deleteNote(noteId: Int) {
-        _notes.update { currentNotes ->
-            currentNotes.filterNot { note ->
-                note.id == noteId
-            }
+        viewModelScope.launch {
+            repository.deleteNoteById(noteId)
         }
-
-        refreshListState()
-    }
-
-    private fun createNewNote(state: NoteEditUiState) {
-        val newNote = Note(
-            id = generateNextId(),
-            title = state.title.trim(),
-            text = state.text.trim(),
-            color = state.color
-        )
-
-        _notes.update { currentNotes ->
-            currentNotes + newNote
-        }
-    }
-
-    private fun updateExistingNote(state: NoteEditUiState) {
-        val noteId = state.noteId ?: return
-
-        _notes.update { currentNotes ->
-            currentNotes.map { note ->
-                if (note.id == noteId) {
-                    note.copy(
-                        title = state.title.trim(),
-                        text = state.text.trim(),
-                        color = state.color
-                    )
-                } else {
-                    note
-                }
-            }
-        }
-    }
-
-    private fun refreshListState() {
-        _notesListUiState.value = NotesListUiState(
-            notes = _notes.value
-        )
-    }
-
-    private fun generateNextId(): Int {
-        return (_notes.value.maxOfOrNull { note -> note.id } ?: 0) + 1
     }
 }
