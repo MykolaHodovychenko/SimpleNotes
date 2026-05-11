@@ -1,0 +1,27 @@
+# Build files for app module
+/build/
+
+# Android generated files
+/captures/
+/.externalNativeBuild/
+/.cxx/
+
+# APK / AAB generated from this module
+*.apk
+*.aab
+*.ap_
+*.aar
+
+# Generated output files
+output.json
+
+# Local secrets for this module
+secrets.properties
+*.properties.local
+
+# Keystore files
+*.jks
+*.keystore
+
+# Logs
+*.log
