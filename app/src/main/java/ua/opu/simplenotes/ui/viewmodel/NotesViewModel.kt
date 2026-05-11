@@ -9,8 +9,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import ua.opu.simplenotes.data.repository.NoteRepository
 
-class NotesViewModel : ViewModel() {
+class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
 
     private val _notes = MutableStateFlow(
         listOf(
