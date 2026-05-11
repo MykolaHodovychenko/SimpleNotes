@@ -52,7 +52,6 @@ enum class NoteColor {
     Pink,
     Purple,
     Orange
-
 }
 
 data class NotesListUiState(
